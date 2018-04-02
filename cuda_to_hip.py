@@ -169,7 +169,10 @@ def preprocessor(filepath, stats):
 
                 # Replace all occurances
                 if cuda_type in output_source:
-                    output_source = output_source.replace(cuda_type, hip_type)
+                    output_source = re.sub(
+                        r'\b(%s)\b' % cuda_type,
+                        lambda input: hip_type,
+                        output_source)
 
         # Perform Kernel Launch Replacements
         output_source = processKernelLaunches(output_source, stats)
