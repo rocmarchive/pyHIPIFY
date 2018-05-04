@@ -202,7 +202,7 @@ CUDA_TYPE_NAME_MAP = {
      "curandDirectionVectors32_t": ("hiprngDirectionVectors32_t", CONV_TYPE, API_RAND),
      "curandDirectionVectors64_t": ("hiprngDirectionVectors64_t", CONV_TYPE, API_RAND, HIP_UNSUPPORTED),
      "curandStateMtgp32_t": ("hiprngStateMtgp32_t", CONV_TYPE, API_RAND),
-     "curandStateMtgp32": ("hiprngStateMtgp32", CONV_TYPE, API_RAND),
+     "curandStateMtgp32": ("hcrngStateMtgp32", CONV_TYPE, API_RAND),
      "curandStateScrambledSobol64_t": ("hiprngStateScrambledSobol64_t", CONV_TYPE, API_RAND, HIP_UNSUPPORTED),
      "curandStateSobol64_t": ("hiprngStateSobol64_t", CONV_TYPE, API_RAND, HIP_UNSUPPORTED),
      "curandStateScrambledSobol32_t": ("hiprngStateScrambledSobol32_t", CONV_TYPE, API_RAND, HIP_UNSUPPORTED),
@@ -247,6 +247,7 @@ CUDA_INCLUDE_MAP = {
      "cusparse.h": ("hipsparse.h", CONV_INCLUDE, API_RAND),
      "#include <cufft.h>": ("", CONV_INCLUDE, API_RAND, HIP_UNSUPPORTED),
      "#include <cufftXt.h>": ("", CONV_INCLUDE, API_RAND, HIP_UNSUPPORTED),
+     "#include <nvfunctional>": ("", CONV_INCLUDE, API_RAND, HIP_UNSUPPORTED),
 }
 
 CUDA_IDENTIFIER_MAP = {
@@ -1964,7 +1965,7 @@ CUDA_IDENTIFIER_MAP = {
      "cublasDrotm_v2": ("hipblasDrotm", CONV_MATH_FUNC, API_BLAS, HIP_UNSUPPORTED),
      "cublasSrotmg_v2": ("hipblasSrotmg", CONV_MATH_FUNC, API_BLAS, HIP_UNSUPPORTED),
      "cublasDrotmg_v2": ("hipblasDrotmg", CONV_MATH_FUNC, API_BLAS, HIP_UNSUPPORTED),
-     "curand_STATUS_SUCCESS": ("hiprng_STATUS_SUCCESS", CONV_NUMERIC_LITERAL, API_RAND),
+     "CURAND_STATUS_SUCCESS": ("HIPRNG_STATUS_SUCCESS", CONV_NUMERIC_LITERAL, API_RAND),
      "curand_STATUS_VERSION_MISMATCH": ("hiprng_STATUS_VERSION_MISMATCH", CONV_NUMERIC_LITERAL, API_RAND),
      "curand_STATUS_NOT_INITIALIZED": ("hiprng_STATUS_NOT_INITIALIZED", CONV_NUMERIC_LITERAL, API_RAND),
      "curand_STATUS_ALLOCATION_FAILED": ("hiprng_STATUS_ALLOCATION_FAILED", CONV_NUMERIC_LITERAL, API_RAND),
@@ -1978,6 +1979,7 @@ CUDA_IDENTIFIER_MAP = {
      "curand_STATUS_ARCH_MISMATCH": ("hiprng_STATUS_ARCH_MISMATCH", CONV_NUMERIC_LITERAL, API_RAND),
      "curand_STATUS_INTERNAL_ERROR": ("hiprng_STATUS_INTERNAL_ERROR", CONV_NUMERIC_LITERAL, API_RAND),
      "curand_RNG_TEST": ("hiprng_RNG_TEST", CONV_NUMERIC_LITERAL, API_RAND),
+     "mtgp32dc_params_fast_11213": ("mtgp32_params_fast_11213", CONV_NUMERIC_LITERAL, API_RAND),
      "curand_RNG_PSEUDO_DEFAULT": ("hiprng_RNG_PSEUDO_DEFAULT", CONV_NUMERIC_LITERAL, API_RAND),
      "curand_RNG_PSEUDO_XORWOW": ("hiprng_RNG_PSEUDO_XORWOW", CONV_NUMERIC_LITERAL, API_RAND),
      "curand_RNG_PSEUDO_MRG32K3A": ("hiprng_RNG_PSEUDO_MRG32K3A", CONV_NUMERIC_LITERAL, API_RAND),
@@ -2049,6 +2051,8 @@ CUDA_IDENTIFIER_MAP = {
      "curand_mtgp32_single_specific": ("hiprng_mtgp32_single_specific", CONV_DEVICE_FUNC, API_RAND, HIP_UNSUPPORTED),
      "curand_mtgp32_specific": ("hiprng_mtgp32_specific", CONV_DEVICE_FUNC, API_RAND, HIP_UNSUPPORTED),
      "curand_normal": ("hiprng_normal", CONV_DEVICE_FUNC, API_RAND),
+     "curandMakeMTGP32Constants": ("hiprngMakeMTGP32Constants", CONV_DEVICE_FUNC, API_RAND),
+     "curandMakeMTGP32KernelState": ("hiprngMakeMTGP32KernelState", CONV_DEVICE_FUNC, API_RAND),
      "curand_normal_double": ("hiprng_normal_double", CONV_DEVICE_FUNC, API_RAND),
      "curand_normal2": ("hiprng_normal2", CONV_DEVICE_FUNC, API_RAND),
      "curand_normal2_double": ("hiprng_normal2_double", CONV_DEVICE_FUNC, API_RAND),
