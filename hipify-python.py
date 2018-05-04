@@ -56,7 +56,7 @@ def update_progress_bar(total, progress):
     sys.stdout.flush()
 
 
-def walk_over_directory(path, extensions, show_detailed=False, exclude_dirs=None):
+def walk_over_directory(path, extensions, show_detailed=False, include_dirs=None):
     """ Recursively walk over directory and preprocesses files
     with specified extensions.
 
@@ -67,8 +67,8 @@ def walk_over_directory(path, extensions, show_detailed=False, exclude_dirs=None
     """
 
     # Default argument for excluded directories.
-    if exclude_dirs is None:
-        exclude_dirs = []
+    if include_dirs is None:
+        include_dirs = []
 
     # Dissalow the 'hip' as an extension.
     # .hip has a special meaning
@@ -81,7 +81,7 @@ def walk_over_directory(path, extensions, show_detailed=False, exclude_dirs=None
     # Compute the total number of files to be traversed.
     total_files = 0
     for (dirpath, _dirnames, filenames) in os.walk(path):
-        if sum([1 if re.match(r'(%s)\b' % os.path.join(path, exc), dirpath) else 0 for exc in exclude_dirs]) == 0:
+        if sum([1 if re.match(r'(%s)\b' % os.path.join(path, exc), dirpath) else 0 for exc in include_dirs]):
             for filename in filenames:
                 total_files += reduce(
                     lambda result, ext: filename.endswith("." + ext) or result,
@@ -95,7 +95,7 @@ def walk_over_directory(path, extensions, show_detailed=False, exclude_dirs=None
     # Begin traversing the files.
     for (dirpath, _dirnames, filenames) in os.walk(path, topdown=True):
         # Check if file ends with a valid extensions
-        if sum([1 if re.match(r'(%s)\b' % os.path.join(path, exc), dirpath) else 0  for exc in exclude_dirs]) > 0:
+        if sum([1 if re.match(r'(%s)\b' % os.path.join(path, exc), dirpath) else 0  for exc in include_dirs]) == 0:
             continue
 
         for filename in filenames:
@@ -291,6 +291,7 @@ def disable_function(input_string, function, replace_style):
         1 - Stub the function and return an empty object based off the type.
         2 - Add !defined(__HIP_PLATFORM_HCC__) preprocessors around the function.
         3 - Add !defined(__HIP_DEVICE_COMPILE__) preprocessors around the function.
+        4 - Stub the function and throw an exception at runtime.
     """
 
     info = {
@@ -325,6 +326,9 @@ def disable_function(input_string, function, replace_style):
     else:
         # Automatically detect signature.
         the_match = re.search(r"(((.*) (\*)?)(%s)(\([^{)]*\)))\s*{" % (function.replace("(", "\(").replace(")", "\)")), input_string)
+        if the_match is None:
+            return input_string
+
         func_info = {
             "return_type": the_match.group(2).strip(),
             "function_name": the_match.group(5).strip(),
@@ -393,6 +397,14 @@ def disable_function(input_string, function, replace_style):
         output_string = input_string.replace(
             function_body,
             "#if !defined(__HIP_DEVICE_COMPILE__)\n%s\n#endif" % function_body)
+
+    # Throw an exception at runtime.
+    elif replace_style == 4:
+        stub = "%s{\n%s;\n}" % (
+            function_string,
+            'throw std::runtime_error("The function %s is not implemented.")' %
+            function_string.replace("\n", " "))
+        output_string = input_string.replace(function_body, stub)
 
     return output_string
 
@@ -714,7 +726,7 @@ def main():
     parser.add_argument(
         '--extensions',
         nargs='+',
-        default=["cu", "cuh", "c", "cpp", "h", "in"],
+        default=["cu", "cuh", "c", "cpp", "h", "in", "hpp"],
         help="The extensions for files to run the Hipify script over.",
         required=False)
 
@@ -726,7 +738,7 @@ def main():
         required=False)
 
     parser.add_argument(
-        '--exclude-dirs',
+        '--include-dirs',
         nargs='+',
         default=[],
         help="The directories that should be excluded from hipify.",
@@ -776,16 +788,6 @@ def main():
                     # Store param information inside KernelTemplateParams
                     get_kernel_template_params(the_file, KernelTemplateParams)
 
-    # Start Preprocessor
-    walk_over_directory(
-        args.output_directory,
-        extensions=args.extensions,
-        show_detailed=args.show_detailed,
-        exclude_dirs=args.exclude_dirs)
-
-    if args.add_static_casts:
-        add_static_casts(args, KernelTemplateParams)
-
     # Open YAML file with disable information.
     if args.yaml_settings != "":
         with open(args.yaml_settings, "r") as lines:
@@ -794,12 +796,23 @@ def main():
         # Disable functions in certain files according to YAML description
         for disable_info in yaml_data["disabled_functions"]:
             filepath = os.path.join(args.output_directory, disable_info["path"])
-            functions = disable_info["functions"]
+            if "functions" in disable_info:
+                functions = disable_info["functions"]
+            else:
+                functions = []
+
+            if "device_functions" in disable_info:
+                not_on_device_functions = disable_info["device_functions"]
+            else:
+                not_on_device_functions = []
 
             with open(filepath, "r+") as f:
                 txt = f.read()
                 for func in functions:
                     txt = disable_function(txt, func, 1)
+
+                for func in not_on_device_functions:
+                    txt = disable_function(txt, func, 3)
 
                 f.seek(0)
                 f.write(txt)
@@ -814,8 +827,24 @@ def main():
         # Disable unsupported HIP functions
         for disable in yaml_data["disabled_hip_function_calls"]:
             filepath = os.path.join(args.output_directory, disable["path"])
-            functions = disable["functions"]
-            constants = disable["constants"]
+            if "functions" in disable:
+                functions = disable["functions"]
+            else:
+                functions = []
+
+            if "constants" in disable:
+                constants = disable["constants"]
+            else:
+                constants = []
+
+            if "s_constants" in disable:
+                s_constants = disable["s_constants"]
+            else:
+                s_constants = []
+
+            if not os.path.exists(filepath):
+                print("File %s does not exist." % filepath)
+                continue
             with open(filepath, "r+") as f:
                 txt = f.read()
 
@@ -827,12 +856,25 @@ def main():
                 for const in constants:
                     txt = re.sub(r"\b%s\b" % const, constants[const], txt)
 
+                # Disable Constants Strict
+                for s_const in s_constants:
+                    txt = txt.replace(s_const, s_constants[s_const])
+
                 # Save Changes
                 f.seek(0)
                 f.write(txt)
                 f.truncate()
                 f.close()
 
+    # Start Preprocessor
+    walk_over_directory(
+        args.output_directory,
+        extensions=args.extensions,
+        show_detailed=args.show_detailed,
+        include_dirs=args.include_dirs)
+
+    if args.add_static_casts:
+        add_static_casts(args, KernelTemplateParams)
 
 if __name__ == '__main__':
     main()
