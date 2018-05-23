@@ -34,6 +34,18 @@ from functools import reduce
 from cuda_to_hip_mappings import CUDA_TO_HIP_MAPPINGS
 
 
+# Color coding for printing
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 def update_progress_bar(total, progress):
     """
     Displays and updates a console progress bar.
@@ -56,36 +68,39 @@ def update_progress_bar(total, progress):
     sys.stdout.flush()
 
 
-def walk_over_directory(path, extensions, show_detailed=False, include_dirs=None):
-    """ Recursively walk over directory and preprocesses files
-    with specified extensions.
+def filename_ends_with_extension(filename, extensions):
+    """Helper method to see if filename ends with certain extension"""
+    return reduce(lambda result, ext: filename.endswith("." + ext) or result, extensions, False)
 
-    extensions - A list of file extensions excluding the leading "."
-                (e.g. ['cuh'] not ['.cuh'])
 
-    show_detailed - If set to true, then show all replaced kernels.
+def inside_included_directories(dirpath, rootpath, include_dirs):
+    """Helper method to see if filename within included directories"""
+    return reduce(lambda result, included_directory: re.match(r'(%s)\b' % os.path.join(rootpath, included_directory), dirpath) or result, include_dirs, None)
+
+
+def walk_over_directory(rootpath, extensions, show_detailed=False, include_dirs=None):
     """
+    Recursively walk over directory and call preprocessor on selected files.
+
+    Arguments)
+        extensions - A plist of file extensions ['cu', 'cuh', ..]
+
+        include_dirs - Directories under the rootpath that should be included in the walk.
+
+        show_detailed - Show a detailed summary of the transpilation process.
+    """
+
 
     # Default argument for excluded directories.
     if include_dirs is None:
         include_dirs = []
 
-    # Dissalow the 'hip' as an extension.
-    # .hip has a special meaning
-    #    => i.e. "This file has already been processed and simply needs to be moved"
-    #    => e.g. moving "kernel_file.cu.hip" to "kernel_file.cu"
-    if "hip" in extensions:
-        print(".hip files are assumed to already be preprocessed. \
-        Please remove 'hip' from the extensions list.")
-
     # Compute the total number of files to be traversed.
     total_files = 0
-    for (dirpath, _dirnames, filenames) in os.walk(path):
-        if sum([1 if re.match(r'(%s)\b' % os.path.join(path, exc), dirpath) else 0 for exc in include_dirs]):
+    for (dirpath, _dirnames, filenames) in os.walk(rootpath):
+        if inside_included_directories(dirpath, rootpath, include_dirs):
             for filename in filenames:
-                total_files += reduce(
-                    lambda result, ext: filename.endswith("." + ext) or result,
-                    extensions, False)
+                total_files += filename_ends_with_extension(filename, extensions)
 
     current_file = 0
 
@@ -93,26 +108,14 @@ def walk_over_directory(path, extensions, show_detailed=False, include_dirs=None
     stats = {"unsupported_calls": [], "kernel_launches": []}
 
     # Begin traversing the files.
-    for (dirpath, _dirnames, filenames) in os.walk(path, topdown=True):
+    for (dirpath, _dirnames, filenames) in os.walk(rootpath, topdown=True):
         # Check if file ends with a valid extensions
-        if sum([1 if re.match(r'(%s)\b' % os.path.join(path, exc), dirpath) else 0  for exc in include_dirs]) == 0:
+        if not inside_included_directories(dirpath, rootpath, include_dirs):
             continue
 
         for filename in filenames:
-            # Extract the (.hip)
-            if filename.endswith(".hip"):
-                hip_source = os.sep.join([dirpath, filename])
-                dest_file = hip_source[0:-4]
-
-                # Execute the preprocessor on the specified file.
-                shutil.copy(hip_source, dest_file)
-
-                # Assume (.hip) files are already preprocessed. Continue.
-                continue
-
-            if reduce(
-                lambda result, ext: filename.endswith("." + ext) or result,
-                    extensions, False):
+            if filename_ends_with_extension(filename, extensions):
+                # Construct the file's full path
                 filepath = os.sep.join([dirpath, filename])
 
                 # Execute the preprocessor on the specified file.
@@ -124,11 +127,14 @@ def walk_over_directory(path, extensions, show_detailed=False, include_dirs=None
 
                 current_file += 1
 
-    print("Finished")
-    compute_stats(stats, show_detailed)
+    print(bcolors.OKGREEN + "Successfully preprocessed all matching files." + bcolors.ENDC)
+
+    # Show detailed summary
+    if show_detailed:
+        compute_stats(stats, show_detailed)
 
 
-def compute_stats(stats, show_detailed):
+def compute_stats(stats):
     unsupported_calls = set(cuda_call for (cuda_call, _filepath) in stats["unsupported_calls"])
 
     # Print the number of unsupported calls
@@ -139,10 +145,6 @@ def compute_stats(stats, show_detailed):
 
     # Print the number of kernel launches
     print("\nTotal number of replaced kernel launches: %d" % (len(stats["kernel_launches"])))
-
-    # Show a detailed summary
-    if show_detailed:
-        print("\n".join(stats["kernel_launches"]))
 
 
 def processKernelLaunches(string, stats):
@@ -224,8 +226,11 @@ def processKernelLaunches(string, stats):
         # Extract cuda kernel
         cuda_kernel = string[params[0]["start"]:paranthesis+1]
 
+        # Keep number of kernel launch params consistent (grid dims, group dims, stream, dynamic shared size)
+        num_klp = len(extract_arguments(0, kernel.group().replace("<<<", "(").replace(">>>", ")")))
+
         # Transform cuda kernel to hip kernel
-        hip_kernel = "hipLaunchKernelGGL(" + cuda_kernel[0:-1].replace("<<<", ", ").replace(">>>", ", ")
+        hip_kernel = "hipLaunchKernelGGL(" + cuda_kernel[0:-1].replace(">>>", ", 0"*(4-num_klp) + ">>>").replace("<<<", ", ").replace(">>>", ", ")
 
         # Replace cuda kernel with hip kernel
         output_string = output_string.replace(cuda_kernel, hip_kernel)
@@ -293,7 +298,7 @@ def disable_function(input_string, function, replace_style):
         3 - Add !defined(__HIP_DEVICE_COMPILE__) preprocessors around the function.
         4 - Stub the function and throw an exception at runtime.
     """
-
+# void (*)(hcrngStateMtgp32 *, int, float *, double, double)
     info = {
         "function_start": -1,
         "function_end": -1,
@@ -473,6 +478,12 @@ def file_add_header(filepath, header):
         os.fsync(f)
 
 
+def fix_static_global_kernels(in_txt):
+    """Static global kernels in HIP results in a compilation error."""
+    in_txt = in_txt.replace(" __global__ static", "__global__")
+    return in_txt
+
+
 def get_kernel_template_params(the_file, KernelDictionary):
     """Scan for __global__ kernel definitions then extract its argument types, and static cast as necessary"""
     # Read the kernel file.
@@ -480,7 +491,7 @@ def get_kernel_template_params(the_file, KernelDictionary):
         # Extract all kernels with their templates inside of the file
         string = f.read()
 
-        get_kernel_definitions = [k for k in re.finditer(r"(template[ ]*<(.*)>\n.*\n?)?__global__ void (\w+(\(.*\))?)\(", string)]
+        get_kernel_definitions = [k for k in re.finditer(r"(template[ ]*<(.*)>\n.*\n?)?__global__ void[\n| ](\w+(\(.*\))?)\(", string)]
 
         # Create new launch syntax
         for kernel in get_kernel_definitions:
@@ -608,55 +619,59 @@ def disable_module(input_file):
         f.truncate()
 
 
-def add_static_casts(args, KernelTemplateParams):
-    """Added necessary static casts to kernel launches due to issue in HIP"""
+def extract_arguments(start, string):
+    """ Return the list of arguments in the upcoming function parameter closure"""
+    arguments = []
+    closures = {
+        "<": 0,
+        "(": 0
+    }
+    current_position = start
+    argument_start_pos = current_position + 1
 
+    # Search for final parenthesis
+    while current_position < len(string):
+        if string[current_position] == "(":
+            closures["("] += 1
+        elif string[current_position] == ")":
+            closures["("] -= 1
+        elif string[current_position] == "<":
+            closures["<"] += 1
+        elif string[current_position] == ">" and string[current_position-1] != "-":
+            closures["<"] -= 1
+
+        # Finished all arguments
+        if closures["("] == 0 and closures["<"] == 0:
+            # Add final argument
+            arguments.append({"start": argument_start_pos, "end": current_position})
+            break
+
+        # Finished current argument
+        if closures["("] == 1 and closures["<"] == 0 and string[current_position] == ",":
+            arguments.append({"start": argument_start_pos, "end": current_position})
+            argument_start_pos = current_position + 1
+
+        current_position += 1
+
+    return arguments
+
+
+def add_static_casts(directory, extensions, KernelTemplateParams):
+    """Added necessary static casts to kernel launches due to issue in HIP"""
     # Add static_casts<> to all kernel launches.
-    for (dirpath, _dirnames, filenames) in os.walk(args.output_directory):
+    for (dirpath, _dirnames, filenames) in os.walk(directory):
         for filename in filenames:
-            if reduce(
-                lambda result, ext: filename.endswith("." + ext) or result,
-                    args.extensions, False):
+            if filename_ends_with_extension(filename, extensions):
                 filepath = os.sep.join([dirpath, filename])
                 with open(filepath, "r+") as fileobj:
-                    output_source = fileobj.read()
-                    new_output_source = output_source
-                    get_kernel_definitions = [k for k in re.finditer("hipLaunchKernelGGL\(", output_source)]
+                    input_source = fileobj.read()
+                    new_output_source = input_source
+                    get_kernel_definitions = [k for k in re.finditer("hipLaunchKernelGGL\(", input_source)]
                     for kernel in get_kernel_definitions:
-                        arguments = []
-                        closures = {
-                            "<": 0,
-                            "(": 1
-                        }
-                        current_position = kernel.end()
-                        argument_start_pos = current_position
-
-                        # Search for final parenthesis
-                        while current_position < len(output_source):
-                            if output_source[current_position] == "(":
-                                closures["("] += 1
-                            elif output_source[current_position] == ")":
-                                closures["("] -= 1
-                            elif output_source[current_position] == "<":
-                                closures["<"] += 1
-                            elif output_source[current_position] == ">" and output_source[current_position-1] != "-":
-                                closures["<"] -= 1
-
-                            # Finished all arguments
-                            if closures["("] == 0 and closures["<"] == 0:
-                                # Add final argument
-                                arguments.append({"start": argument_start_pos, "end": current_position})
-                                break
-
-                            # Finished current argument
-                            if closures["("] == 1 and closures["<"] == 0 and output_source[current_position] == ",":
-                                arguments.append({"start": argument_start_pos, "end": current_position})
-                                argument_start_pos = current_position + 1
-
-                            current_position += 1
+                        arguments = extract_arguments(kernel.end()-1, input_source)
 
                         # Check if we have templating + static_cast information
-                        argument_strings = [output_source[arg["start"]:arg["end"]] for arg in arguments]
+                        argument_strings = [input_source[arg["start"]:arg["end"]] for arg in arguments]
                         kernel_name = argument_strings[0].strip()
                         ignore = ["upscale"]
                         if kernel_name in KernelTemplateParams and kernel_name not in ignore:
@@ -665,7 +680,7 @@ def add_static_casts(args, KernelTemplateParams):
                             kernel_name_with_template = KernelTemplateParams[kernel_name]["kernel_with_template"]
                             argument_types = KernelTemplateParams[kernel_name]["arg_types"]
 
-                            old_kernel_launch = output_source[arguments[0]["start"]:arguments[-1]["end"]]
+                            old_kernel_launch = input_source[arguments[0]["start"]:arguments[-1]["end"]]
                             new_kernel_launch = old_kernel_launch
 
                             kernel_params = argument_strings[5:]
@@ -741,7 +756,7 @@ def main():
         '--include-dirs',
         nargs='+',
         default=[],
-        help="The directories that should be excluded from hipify.",
+        help="The directories under the root that should be included.",
         required=False)
 
     parser.add_argument(
@@ -760,29 +775,31 @@ def main():
 
     args = parser.parse_args()
 
-    # Sanity check arguments
+    # Verify the project directory exists.
     if not os.path.exists(args.project_directory):
         print("The project folder specified does not exist.")
         return
 
-    # If output directory not set, provide a default output directory.
+    # Make sure output directory exists.
+    if not os.path.exists(args.output_directory):
+        print("The output folder already exists.")
+        return
+
+    # If no output directory, provide a default one.
     if args.output_directory is "":
         args.project_directory = args.project_directory[0:-1] if args.project_directory.endswith("/") else args.project_directory
         args.output_directory = args.project_directory + "_amd"
 
-    # Make sure output directory doesn't already exist.
+    # Copy from project directory to output directory if not done already.
     if not os.path.exists(args.output_directory):
         shutil.copytree(args.project_directory, args.output_directory)
 
-    # Remove periods from extensions
-    args.extensions = map(lambda ext: ext[1:] if ext[0] is "." else ext, args.extensions)
-
-    # Add static_casts
+    # Extract all of the kernel parameter and template type information.
     if args.add_static_casts:
         KernelTemplateParams = {}
         for (dirpath, _dirnames, filenames) in os.walk(args.output_directory):
             for filename in filenames:
-                if reduce(lambda result, ext: filename.endswith("." + ext) or result, args.extensions, False):
+                if filename_ends_with_extension(filename, args.extensions) and inside_included_directories(dirpath, args.output_directory, args.include_dirs):
                     the_file = os.sep.join([dirpath, filename])
 
                     # Store param information inside KernelTemplateParams
@@ -801,17 +818,28 @@ def main():
             else:
                 functions = []
 
-            if "device_functions" in disable_info:
-                not_on_device_functions = disable_info["device_functions"]
+            if "non_hip_functions" in disable_info:
+                non_hip_functions = disable_info["non_hip_functions"]
+            else:
+                non_hip_functions = []
+
+            if "non_device_functions" in disable_info:
+                not_on_device_functions = disable_info["non_device_functions"]
             else:
                 not_on_device_functions = []
 
             with open(filepath, "r+") as f:
                 txt = f.read()
                 for func in functions:
+                    # Stub the function and return empty object
                     txt = disable_function(txt, func, 1)
 
+                for func in non_hip_functions:
+                    # Disable this function on HIP stack
+                    txt = disable_function(txt, func, 2)
+
                 for func in not_on_device_functions:
+                    # Disable this function when compiling on Device
                     txt = disable_function(txt, func, 3)
 
                 f.seek(0)
@@ -825,7 +853,7 @@ def main():
             disable_module(os.path.join(args.output_directory, module))
 
         # Disable unsupported HIP functions
-        for disable in yaml_data["disabled_hip_function_calls"]:
+        for disable in yaml_data["disable_unsupported_hip_calls"]:
             filepath = os.path.join(args.output_directory, disable["path"])
             if "functions" in disable:
                 functions = disable["functions"]
@@ -843,8 +871,9 @@ def main():
                 s_constants = []
 
             if not os.path.exists(filepath):
-                print("File %s does not exist." % filepath)
+                print("\n" + bcolors.WARNING + "YAML Warning: File %s does not exist." % filepath + bcolors.ENDC)
                 continue
+
             with open(filepath, "r+") as f:
                 txt = f.read()
 
@@ -852,11 +881,11 @@ def main():
                 for func in functions:
                     txt = disable_unsupported_function_call(func, txt, functions[func])
 
-                # Disable Constants
+                # Disable Constants w\ Boundary.
                 for const in constants:
                     txt = re.sub(r"\b%s\b" % const, constants[const], txt)
 
-                # Disable Constants Strict
+                # Disable Constants
                 for s_const in s_constants:
                     txt = txt.replace(s_const, s_constants[s_const])
 
@@ -874,7 +903,9 @@ def main():
         include_dirs=args.include_dirs)
 
     if args.add_static_casts:
-        add_static_casts(args, KernelTemplateParams)
+        # Execute the Clang Tool to Automatically add static casts
+        add_static_casts(args.output_directory, args.extensions, KernelTemplateParams)
+
 
 if __name__ == '__main__':
     main()
