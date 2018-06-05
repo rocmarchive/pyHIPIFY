@@ -62,7 +62,7 @@ def update_progress_bar(total, progress):
         status)
 
     # Send the progress to stdout.
-    sys.stdout.write(text)
+    sys.stdout.write(text.encode('utf-8'))
 
     # Send the buffered text to stdout!
     sys.stdout.flush()
@@ -417,7 +417,7 @@ def disable_function(input_string, function, replace_style):
 def preprocessor(filepath, stats):
     """ Executes the CUDA -> HIP conversion on the specified file. """
     with open(filepath, "r+") as fileobj:
-        output_source = fileobj.read()
+        output_source = fileobj.read().decode("UTF-8")
 
         # Perform type, method, constant replacements
         for mapping in CUDA_TO_HIP_MAPPINGS:
@@ -443,7 +443,7 @@ def preprocessor(filepath, stats):
 
         # Overwrite file contents
         fileobj.seek(0)
-        fileobj.write(output_source)
+        fileobj.write(output_source.encode('utf-8'))
         fileobj.truncate()
         fileobj.flush()
 
@@ -453,13 +453,13 @@ def preprocessor(filepath, stats):
 
 def file_specific_replacement(filepath, search_string, replace_string, strict = False):
     with open(filepath, "r+") as f:
-        contents = f.read()
+        contents = f.read().decode("UTF-8")
         if strict:
             contents = re.sub(r'\b(%s)\b' % search_string, lambda x: replace_string, contents)
         else:
             contents = contents.replace(search_string, replace_string)
         f.seek(0)
-        f.write(contents)
+        f.write(contents.encode('utf-8'))
         f.truncate()
         f.flush()
         os.fsync(f)
@@ -467,12 +467,12 @@ def file_specific_replacement(filepath, search_string, replace_string, strict = 
 
 def file_add_header(filepath, header):
     with open(filepath, "r+") as f:
-        contents = f.read()
+        contents = f.read().decode("UTF-8")
         if header[0] != "<" and header[-1] != ">":
             header = '"%s"' % header
         contents = ('#include %s \n' % header) + contents
         f.seek(0)
-        f.write(contents)
+        f.write(contents.encode('utf-8'))
         f.truncate()
         f.flush()
         os.fsync(f)
@@ -489,7 +489,7 @@ def get_kernel_template_params(the_file, KernelDictionary):
     # Read the kernel file.
     with open(the_file, "r") as f:
         # Extract all kernels with their templates inside of the file
-        string = f.read()
+        string = f.read().decode("UTF-8")
 
         get_kernel_definitions = [k for k in re.finditer(r"(template[ ]*<(.*)>\n.*\n?)?__global__ void[\n| ](\w+(\(.*\))?)\(", string)]
 
@@ -608,14 +608,14 @@ def disable_unsupported_function_call(function, input_string, replacement):
 def disable_module(input_file):
     """Disable a module entirely except for header includes."""
     with open(input_file, "r+") as f:
-        txt = f.read()
+        txt = f.read().decode("UTF-8")
         last = list(re.finditer(r"#include .*\n", txt))[-1]
         end = last.end()
 
         disabled = "%s#if !defined(__HIP_PLATFORM_HCC__)\n%s\n#endif" % (txt[0:end], txt[end:])
 
         f.seek(0)
-        f.write(disabled)
+        f.write(disabled.encode('utf-8'))
         f.truncate()
 
 
@@ -664,7 +664,7 @@ def add_static_casts(directory, extensions, KernelTemplateParams):
             if filename_ends_with_extension(filename, extensions):
                 filepath = os.sep.join([dirpath, filename])
                 with open(filepath, "r+") as fileobj:
-                    input_source = fileobj.read()
+                    input_source = fileobj.read().decode("UTF-8")
                     new_output_source = input_source
                     get_kernel_definitions = [k for k in re.finditer("hipLaunchKernelGGL\(", input_source)]
                     for kernel in get_kernel_definitions:
@@ -707,7 +707,7 @@ def add_static_casts(directory, extensions, KernelTemplateParams):
 
                     # Overwrite file contents
                     fileobj.seek(0)
-                    fileobj.write(new_output_source)
+                    fileobj.write(new_output_source.encode('utf-8'))
                     fileobj.truncate()
                     fileobj.flush()
 
@@ -829,7 +829,7 @@ def main():
                 not_on_device_functions = []
 
             with open(filepath, "r+") as f:
-                txt = f.read()
+                txt = f.read().decode("UTF-8")
                 for func in functions:
                     # Stub the function and return empty object
                     txt = disable_function(txt, func, 1)
@@ -843,7 +843,7 @@ def main():
                     txt = disable_function(txt, func, 3)
 
                 f.seek(0)
-                f.write(txt)
+                f.write(txt.encode('utf-8'))
                 f.truncate()
                 f.close()
 
@@ -875,7 +875,7 @@ def main():
                 continue
 
             with open(filepath, "r+") as f:
-                txt = f.read()
+                txt = f.read().decode("UTF-8")
 
                 # Disable HIP Functions
                 for func in functions:
@@ -891,7 +891,7 @@ def main():
 
                 # Save Changes
                 f.seek(0)
-                f.write(txt)
+                f.write(txt.encode('utf-8'))
                 f.truncate()
                 f.close()
 
