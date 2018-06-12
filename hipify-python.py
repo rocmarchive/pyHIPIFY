@@ -418,13 +418,13 @@ def disable_function(input_string, function, replace_style):
             function_string.replace("\n", " "))
         output_string = input_string.replace(function_body, stub)
 
-   elif replace_style == 5:
+    elif replace_style == 5:
         stub = "%s{\n%s;\n}" % (
             function_string, 
             'assert(0)')
         output_string = input_string.replace(function_body, stub)
 
-   elif replace_style == 6:
+    elif replace_style == 6:
         stub = "%s{\n;\n}" % (function_string)
         output_string = input_string.replace(function_body, stub)
     return output_string
