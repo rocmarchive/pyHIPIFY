@@ -392,7 +392,7 @@ def disable_function(input_string, function, replace_style):
         elif "*" in func_info["return_type"]:
             stub = "%s{\nreturn %s;\n}" % (function_string, "NULL") #nullptr
         else:
-            stub = "%s{\n%s stub_var = NULL;\nreturn stub_var;\n}" % (function_string, func_info["return_type"])
+            stub = "%s{\n%s stub_var;\nreturn stub_var;\n}" % (function_string, func_info["return_type"])
 
         output_string = input_string.replace(function_body, stub)
 
