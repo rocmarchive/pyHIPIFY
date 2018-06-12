@@ -426,7 +426,7 @@ def preprocessor(filepath, stats):
 
         # Perform type, method, constant replacements
         for mapping in CUDA_TO_HIP_MAPPINGS:
-            for cuda_type, value in mapping.iteritems():
+            for cuda_type, value in mapping.items():
                 # Extract relevant information
                 hip_type = value[0]
                 meta_data = value[1:]
