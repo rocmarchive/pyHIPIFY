@@ -420,7 +420,7 @@ def disable_function(input_string, function, replace_style):
 
     elif replace_style == 5:
         stub = "%s{\n%s;\n}" % (
-            function_string, 
+            function_string,
             'assert(0)')
         output_string = input_string.replace(function_body, stub)
 
@@ -821,6 +821,18 @@ def main():
                     # Store param information inside KernelTemplateParams
                     get_kernel_template_params(the_file, KernelTemplateParams)
 
+    # Start Preprocessor
+    walk_over_directory(
+        args.output_directory,
+        extensions=args.extensions,
+        show_detailed=args.show_detailed,
+        include_dirs=args.include_dirs)
+
+    # Include Static casts to kernels
+    if args.add_static_casts:
+        # Execute the Clang Tool to Automatically add static casts
+        add_static_casts(args.output_directory, args.extensions, KernelTemplateParams)
+
     # Open YAML file with disable information.
     if args.yaml_settings != "":
         with openf(args.yaml_settings, "r") as lines:
@@ -910,17 +922,6 @@ def main():
                 f.write(txt)
                 f.truncate()
                 f.close()
-
-    # Start Preprocessor
-    walk_over_directory(
-        args.output_directory,
-        extensions=args.extensions,
-        show_detailed=args.show_detailed,
-        include_dirs=args.include_dirs)
-
-    if args.add_static_casts:
-        # Execute the Clang Tool to Automatically add static casts
-        add_static_casts(args.output_directory, args.extensions, KernelTemplateParams)
 
 
 if __name__ == '__main__':
