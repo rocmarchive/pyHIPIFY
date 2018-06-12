@@ -302,6 +302,8 @@ def disable_function(input_string, function, replace_style):
         2 - Add !defined(__HIP_PLATFORM_HCC__) preprocessors around the function.
         3 - Add !defined(__HIP_DEVICE_COMPILE__) preprocessors around the function.
         4 - Stub the function and throw an exception at runtime.
+        5 - Stub the function and throw an assert(0).
+        6 - Stub the function and keep an empty body.
     """
 # void (*)(hcrngStateMtgp32 *, int, float *, double, double)
     info = {
@@ -416,6 +418,15 @@ def disable_function(input_string, function, replace_style):
             function_string.replace("\n", " "))
         output_string = input_string.replace(function_body, stub)
 
+   elif replace_style == 5:
+        stub = "%s{\n%s;\n}" % (
+            function_string, 
+            'assert(0)')
+        output_string = input_string.replace(function_body, stub)
+
+   elif replace_style == 6:
+        stub = "%s{\n;\n}" % (function_string)
+        output_string = input_string.replace(function_body, stub)
     return output_string
 
 
@@ -836,8 +847,8 @@ def main():
             with openf(filepath, "r+") as f:
                 txt = f.read()
                 for func in functions:
-                    # Throw an exception when function is called
-                    txt = disable_function(txt, func, 4)
+                    # TODO - Find fix assertions in HIP for device code.
+                    txt = disable_function(txt, func, 6)
 
                 for func in non_hip_functions:
                     # Disable this function on HIP stack
