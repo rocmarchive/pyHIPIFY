@@ -836,8 +836,8 @@ def main():
             with openf(filepath, "r+") as f:
                 txt = f.read()
                 for func in functions:
-                    # Stub the function and return empty object
-                    txt = disable_function(txt, func, 1)
+                    # Throw an exception when function is called
+                    txt = disable_function(txt, func, 4)
 
                 for func in non_hip_functions:
                     # Disable this function on HIP stack
