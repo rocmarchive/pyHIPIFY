@@ -33,6 +33,11 @@ import yaml
 from functools import reduce
 from cuda_to_hip_mappings import CUDA_TO_HIP_MAPPINGS
 
+def openf(filename, mode):
+   if sys.version_info[0] == 3:
+      return open(filename, mode, errors='ignore')
+   else:
+      return open(filename, mode)
 
 # Color coding for printing
 class bcolors:
@@ -416,7 +421,7 @@ def disable_function(input_string, function, replace_style):
 
 def preprocessor(filepath, stats):
     """ Executes the CUDA -> HIP conversion on the specified file. """
-    with open(filepath, "r+") as fileobj:
+    with openf(filepath, "r+") as fileobj:
         output_source = fileobj.read()
 
         # Perform type, method, constant replacements
@@ -452,7 +457,7 @@ def preprocessor(filepath, stats):
 
 
 def file_specific_replacement(filepath, search_string, replace_string, strict = False):
-    with open(filepath, "r+") as f:
+    with openf(filepath, "r+") as f:
         contents = f.read()
         if strict:
             contents = re.sub(r'\b(%s)\b' % search_string, lambda x: replace_string, contents)
@@ -466,7 +471,7 @@ def file_specific_replacement(filepath, search_string, replace_string, strict = 
 
 
 def file_add_header(filepath, header):
-    with open(filepath, "r+") as f:
+    with openf(filepath, "r+") as f:
         contents = f.read()
         if header[0] != "<" and header[-1] != ">":
             header = '"%s"' % header
@@ -487,7 +492,7 @@ def fix_static_global_kernels(in_txt):
 def get_kernel_template_params(the_file, KernelDictionary):
     """Scan for __global__ kernel definitions then extract its argument types, and static cast as necessary"""
     # Read the kernel file.
-    with open(the_file, "r") as f:
+    with openf(the_file, "r") as f:
         # Extract all kernels with their templates inside of the file
         string = f.read()
 
@@ -607,7 +612,7 @@ def disable_unsupported_function_call(function, input_string, replacement):
 
 def disable_module(input_file):
     """Disable a module entirely except for header includes."""
-    with open(input_file, "r+") as f:
+    with openf(input_file, "r+") as f:
         txt = f.read()
         last = list(re.finditer(r"#include .*\n", txt))[-1]
         end = last.end()
@@ -663,7 +668,7 @@ def add_static_casts(directory, extensions, KernelTemplateParams):
         for filename in filenames:
             if filename_ends_with_extension(filename, extensions):
                 filepath = os.sep.join([dirpath, filename])
-                with open(filepath, "r+") as fileobj:
+                with openf(filepath, "r+") as fileobj:
                     input_source = fileobj.read()
                     new_output_source = input_source
                     get_kernel_definitions = [k for k in re.finditer("hipLaunchKernelGGL\(", input_source)]
@@ -807,7 +812,7 @@ def main():
 
     # Open YAML file with disable information.
     if args.yaml_settings != "":
-        with open(args.yaml_settings, "r") as lines:
+        with openf(args.yaml_settings, "r") as lines:
             yaml_data = yaml.load(lines)
 
         # Disable functions in certain files according to YAML description
@@ -828,7 +833,7 @@ def main():
             else:
                 not_on_device_functions = []
 
-            with open(filepath, "r+") as f:
+            with openf(filepath, "r+") as f:
                 txt = f.read()
                 for func in functions:
                     # Stub the function and return empty object
@@ -874,7 +879,7 @@ def main():
                 print("\n" + bcolors.WARNING + "YAML Warning: File %s does not exist." % filepath + bcolors.ENDC)
                 continue
 
-            with open(filepath, "r+") as f:
+            with openf(filepath, "r+") as f:
                 txt = f.read()
 
                 # Disable HIP Functions
