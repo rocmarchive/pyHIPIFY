@@ -417,7 +417,7 @@ def disable_function(input_string, function, replace_style):
 def preprocessor(filepath, stats):
     """ Executes the CUDA -> HIP conversion on the specified file. """
     with open(filepath, "r+") as fileobj:
-        output_source = fileobj.read().decode("UTF-8")
+        output_source = fileobj.read().encode("UTF-8")
 
         # Perform type, method, constant replacements
         for mapping in CUDA_TO_HIP_MAPPINGS:
@@ -453,7 +453,7 @@ def preprocessor(filepath, stats):
 
 def file_specific_replacement(filepath, search_string, replace_string, strict = False):
     with open(filepath, "r+") as f:
-        contents = f.read().decode("UTF-8")
+        contents = f.read().encode("UTF-8")
         if strict:
             contents = re.sub(r'\b(%s)\b' % search_string, lambda x: replace_string, contents)
         else:
@@ -467,7 +467,7 @@ def file_specific_replacement(filepath, search_string, replace_string, strict = 
 
 def file_add_header(filepath, header):
     with open(filepath, "r+") as f:
-        contents = f.read().decode("UTF-8")
+        contents = f.read().encode("UTF-8")
         if header[0] != "<" and header[-1] != ">":
             header = '"%s"' % header
         contents = ('#include %s \n' % header) + contents
@@ -489,7 +489,7 @@ def get_kernel_template_params(the_file, KernelDictionary):
     # Read the kernel file.
     with open(the_file, "r") as f:
         # Extract all kernels with their templates inside of the file
-        string = f.read().decode("UTF-8")
+        string = f.read().encode("UTF-8")
 
         get_kernel_definitions = [k for k in re.finditer(r"(template[ ]*<(.*)>\n.*\n?)?__global__ void[\n| ](\w+(\(.*\))?)\(", string)]
 
@@ -608,7 +608,7 @@ def disable_unsupported_function_call(function, input_string, replacement):
 def disable_module(input_file):
     """Disable a module entirely except for header includes."""
     with open(input_file, "r+") as f:
-        txt = f.read().decode("UTF-8")
+        txt = f.read().encode("UTF-8")
         last = list(re.finditer(r"#include .*\n", txt))[-1]
         end = last.end()
 
@@ -664,7 +664,7 @@ def add_static_casts(directory, extensions, KernelTemplateParams):
             if filename_ends_with_extension(filename, extensions):
                 filepath = os.sep.join([dirpath, filename])
                 with open(filepath, "r+") as fileobj:
-                    input_source = fileobj.read().decode("UTF-8")
+                    input_source = fileobj.read().encode("UTF-8")
                     new_output_source = input_source
                     get_kernel_definitions = [k for k in re.finditer("hipLaunchKernelGGL\(", input_source)]
                     for kernel in get_kernel_definitions:
@@ -829,7 +829,7 @@ def main():
                 not_on_device_functions = []
 
             with open(filepath, "r+") as f:
-                txt = f.read().decode("UTF-8")
+                txt = f.read().encode("UTF-8")
                 for func in functions:
                     # Stub the function and return empty object
                     txt = disable_function(txt, func, 1)
@@ -875,7 +875,7 @@ def main():
                 continue
 
             with open(filepath, "r+") as f:
-                txt = f.read().decode("UTF-8")
+                txt = f.read().encode("UTF-8")
 
                 # Disable HIP Functions
                 for func in functions:
