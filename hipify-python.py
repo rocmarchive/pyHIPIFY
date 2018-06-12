@@ -848,7 +848,7 @@ def main():
                 txt = f.read()
                 for func in functions:
                     # TODO - Find fix assertions in HIP for device code.
-                    txt = disable_function(txt, func, 6)
+                    txt = disable_function(txt, func, 5)
 
                 for func in non_hip_functions:
                     # Disable this function on HIP stack
