@@ -725,12 +725,11 @@ def add_static_casts(directory, extensions, KernelTemplateParams):
                                     arg = kernel_params[arg_idx].strip()
                                     the_type = argument_types[arg_idx]
                                     the_arg = arg.replace("\n", "").replace("\\", "").strip()
-                                    if the_type in ["int", "const int", "int64_t", "THCIndex_t *", "const int *", "ptrdiff_t", "long", "const int64_t*", "int64_t *", "double"]:
-                                        static_argument = "static_cast<%s>(%s)" % (the_type, the_arg)
-                                        static_argument = arg.replace(the_arg, static_argument)
+                                    static_argument = "static_cast<%s>(%s)" % (the_type, the_arg)
+                                    static_argument = arg.replace(the_arg, static_argument)
 
-                                        # Update to static_cast
-                                        new_kernel_launch = new_kernel_launch.replace(arg, static_argument, 1)
+                                    # Update to static_cast
+                                    new_kernel_launch = new_kernel_launch.replace(arg, static_argument, 1)
 
                             # Add template type
                             if "THCUNN" in filepath.split("/") and "generic" not in filepath.split("/"):
