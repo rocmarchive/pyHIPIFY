@@ -722,7 +722,6 @@ def add_static_casts(directory, extensions, KernelTemplateParams):
                             kernel_params = argument_strings[5:]
                             for arg_idx, arg in enumerate(kernel_params):
                                 if arg_idx in argument_types:
-                                    arg = kernel_params[arg_idx].strip()
                                     the_type = argument_types[arg_idx]
                                     the_arg = arg.replace("\n", "").replace("\\", "").strip()
                                     static_argument = "static_cast<%s>(%s)" % (the_type, the_arg)
