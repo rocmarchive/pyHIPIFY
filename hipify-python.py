@@ -707,7 +707,8 @@ def add_static_casts(directory, extensions, KernelTemplateParams):
 
                         # Check if we have templating + static_cast information
                         argument_strings = [input_source[arg["start"]:arg["end"]] for arg in arguments]
-                        kernel_name = argument_strings[0].strip()
+                        original_kernel_name_with_template = argument_strings[0]
+                        kernel_name = original_kernel_name_with_template.split("<")[0].strip()
                         ignore = ["upscale"]
                         if kernel_name in KernelTemplateParams and kernel_name not in ignore:
                             # Add template to the kernel
@@ -734,7 +735,7 @@ def add_static_casts(directory, extensions, KernelTemplateParams):
                             # Add template type
                             if "THCUNN" in filepath.split("/") and "generic" not in filepath.split("/"):
                                 kernel_name_with_template = kernel_name_with_template.replace("<real>", "<Dtype>")
-                            new_kernel_launch = re.sub(r'\b(%s)\b' % kernel_name, lambda x: kernel_name_with_template, new_kernel_launch)
+                            new_kernel_launch = re.sub(r'\b(%s)\b' % original_kernel_name_with_template, lambda x: kernel_name_with_template, new_kernel_launch)
 
 
                             # Replace Launch
