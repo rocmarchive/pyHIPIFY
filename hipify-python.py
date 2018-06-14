@@ -151,7 +151,6 @@ def compute_stats(stats):
     # Print the number of kernel launches
     print("\nTotal number of replaced kernel launches: %d" % (len(stats["kernel_launches"])))
 
-
 def processKernelLaunches(string, stats):
     """ Replace the CUDA style Kernel launches with the HIP style kernel launches."""
     # Concat the namespace with the kernel names. (Find cleaner way of doing this later).
@@ -160,7 +159,7 @@ def processKernelLaunches(string, stats):
     def grab_method_and_template(in_kernel):
         # The positions for relevant kernel components.
         pos = {
-            "kernel_launch": {"start": in_kernel.start(), "end": in_kernel.end()},
+            "kernel_launch": {"start": in_kernel["start"], "end": in_kernel["end"]},
             "kernel_name": {"start": -1, "end": -1},
             "template": {"start": -1, "end": -1}
         }
@@ -216,8 +215,28 @@ def processKernelLaunches(string, stats):
                         # Finished
                         return [(pos["kernel_name"]), (pos["template"]), (pos["kernel_launch"])]
 
+
+    def find_kernel_bounds(string):
+        """Finds the starting and ending points for all kernel launches in the string."""
+        kernel_end = 0
+        kernel_positions = []
+
+        # Continue until we cannot find any more kernels anymore.
+        while string.find("<<<", kernel_end) != -1:
+            # Get kernel starting position (starting from the previous ending point)
+            kernel_start = string.find("<<<", kernel_end)
+
+            # Get kernel ending position (adjust end point past the >>>)
+            kernel_end = string.find(">>>", kernel_start) + 3
+
+            # Add to list of traversed kernels
+            kernel_positions.append({"start": kernel_start, "end": kernel_end, "group": string[kernel_start: kernel_end]})
+
+        return kernel_positions
+
+
     # Grab positional ranges of all kernel launchces
-    get_kernel_positions = [k for k in re.finditer("<<<\s*(.+)\s*,\s*(.+)\s*(,\s*(.+)\s*)?(,\s*(.+)\s*)?>>>", string)]
+    get_kernel_positions = [k for k in find_kernel_bounds(string)]
     output_string = string
 
     # Replace each CUDA kernel with a HIP kernel.
@@ -226,13 +245,13 @@ def processKernelLaunches(string, stats):
         params = grab_method_and_template(kernel)
 
         # Find paranthesis after kernel launch
-        paranthesis = string.find("(", kernel.end())
+        paranthesis = string.find("(", kernel["end"])
 
         # Extract cuda kernel
         cuda_kernel = string[params[0]["start"]:paranthesis+1]
 
         # Keep number of kernel launch params consistent (grid dims, group dims, stream, dynamic shared size)
-        num_klp = len(extract_arguments(0, kernel.group().replace("<<<", "(").replace(">>>", ")")))
+        num_klp = len(extract_arguments(0, kernel["group"].replace("<<<", "(").replace(">>>", ")")))
 
         # Transform cuda kernel to hip kernel
         hip_kernel = "hipLaunchKernelGGL(" + cuda_kernel[0:-1].replace(">>>", ", 0"*(4-num_klp) + ">>>").replace("<<<", ", ").replace(">>>", ", ")
