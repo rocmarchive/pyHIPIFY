@@ -237,7 +237,7 @@ CUDA_INCLUDE_MAP = {
      "curand_mtgp32.h": ("hiprand_kernel.h", CONV_INCLUDE, API_RAND),
      "curand_mtgp32_host.h": ("hiprand_kernel.h", CONV_INCLUDE, API_RAND),
      "curand_mtgp32_kernel.h": ("hiprand_kernel.h", CONV_INCLUDE, API_RAND),
-     "curand_mtgp32dc_p_11213.h": ("hiprand_kernel.h", CONV_INCLUDE, API_RAND),
+     "curand_mtgp32dc_p_11213.h": ("rocrand_mtgp32_11213.h", CONV_INCLUDE, API_RAND),
      "curand_normal.h": ("hiprand_kernel.h", CONV_INCLUDE, API_RAND),
      "curand_normal_static.h": ("hiprand_kernel.h", CONV_INCLUDE, API_RAND),
      "curand_philox4x32_x.h": ("hiprand_kernel.h", CONV_INCLUDE, API_RAND),
