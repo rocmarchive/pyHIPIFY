@@ -814,11 +814,6 @@ def main():
         print("The project folder specified does not exist.")
         return
 
-    # Make sure output directory exists.
-    if not os.path.exists(args.output_directory):
-        print("The output folder already exists.")
-        return
-
     # If no output directory, provide a default one.
     if args.output_directory is "":
         args.project_directory = args.project_directory[0:-1] if args.project_directory.endswith("/") else args.project_directory
