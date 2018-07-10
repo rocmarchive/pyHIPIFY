@@ -446,7 +446,7 @@ def preprocessor(filepath, stats):
                         stats["unsupported_calls"].append((cuda_type, filepath))
 
                 if cuda_type in output_source:
-                    output_source = re.sub(r'\b(%s)\b' % cuda_type, lambda x: hip_type, output_source)
+                    output_source = re.sub(r'\b(%s)\b' % re.escape(cuda_type), lambda x: hip_type, output_source)
 
         # Perform Kernel Launch Replacements
         output_source = processKernelLaunches(output_source, stats)
